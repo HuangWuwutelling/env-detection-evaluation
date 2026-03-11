@@ -52,7 +52,7 @@ def show_evaluation():
             
             with col2:
                 st.markdown(f"**采样日期**: {selected_sample.collection_date.strftime('%Y-%m-%d') if selected_sample.collection_date else '-'}")
-                st.markdown(f"**检测日期**: {selected_sample.detection_date.strftime('%Y-%m-%d') if selected_sample.detection_date else '-'")
+                st.markdown(f"**检测日期**: {selected_sample.detection_date.strftime('%Y-%m-%d') if selected_sample.detection_date else '-'}")
 
         # 选择评价标准
         st.subheader("2. 选择评价标准")
