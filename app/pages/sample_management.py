@@ -15,6 +15,7 @@ from utils.file_import import (
     parse_sample_data,
     validate_samples_data
 )
+from utils.template_generator import create_template_excel
 
 
 def show_sample_management():
@@ -191,9 +192,58 @@ def show_add_sample_form(service: SampleService, db: Session):
                     st.error(f"添加失败：{str(e)}")
 
 
+def download_template(standard_type: str):
+    """下载指定标准类型的模板"""
+    try:
+        from utils.template_generator import create_template_excel
+        
+        excel_data = create_template_excel(standard_type)
+        
+        file_name = f"{standard_type}样品导入模板.xlsx"
+        
+        import io
+        # 重新生成一次以确保数据完整
+        buffer = io.BytesIO(excel_data)
+        
+        st.download_button(
+            label=f"⬇️ 点击下载 {standard_type}模板",
+            data=buffer.getvalue(),
+            file_name=file_name,
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            key=f"download_{standard_type}_template"
+        )
+        
+        st.success(f"✅ {standard_type}模板已生成，请点击下载按钮保存")
+        
+    except Exception as e:
+        st.error(f"生成模板失败：{str(e)}")
+
+
 def show_batch_import():
     """批量导入功能"""
     st.subheader("批量导入样品")
+
+    # 添加模板下载部分
+    st.subheader("📋 下载数据模板")
+    st.markdown("""
+    请先下载与您评价标准对应的数据模板，按格式填写检测数据后再上传。
+    这样可以确保数据格式正确，避免导入失败。
+    """)
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("📥 地表水模板", use_container_width=True):
+            download_template('地表水')
+        if st.button("📥 地下水模板", use_container_width=True):
+            download_template('地下水')
+    
+    with col2:
+        if st.button("📥 土壤模板", use_container_width=True):
+            download_template('土壤')
+        if st.button("📥 灌溉水模板", use_container_width=True):
+            download_template('灌溉水')
+    
+    st.divider()
 
     uploaded_file = st.file_uploader(
         "上传 Excel 或 CSV 文件",
