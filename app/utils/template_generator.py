@@ -203,7 +203,9 @@ def create_template_excel(standard_type: str, sample_count: int = 10) -> bytes:
                 max_length = 30
             
             column_width = min(max_length, 25)
-            worksheet.column_dimensions[chr(65 + i)].width = column_width
+            # 使用列索引而不是字母来设置宽度
+            col_letter = worksheet.cell(row=1, column=i+1).column_letter
+            worksheet.column_dimensions[col_letter].width = column_width
         
         # 冻结首行
         worksheet.freeze_panes = "A2"
