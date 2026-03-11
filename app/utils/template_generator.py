@@ -31,6 +31,7 @@ def get_template_columns(standard_type: str) -> Dict:
     special_columns = {
         '土壤': {
             '用地类型': str,  # 农用地/建设用地第一类/建设用地第二类
+            '农用地细分': str,  # 水田/旱地/果园/茶园/林地/草地等
             'pH 分段': str     # pH 分段信息（<5.5, 5.5-6.5, 6.5-7.5, >7.5）
         }
     }
@@ -188,8 +189,16 @@ def create_template_excel(standard_type: str, sample_count: int = 10) -> bytes:
         
         # 填充特殊列（如土壤的用地类型）
         if standard_type == '土壤':
-            row['用地类型'] = '农用地' if i % 2 == 0 else '建设用地第一类'
-            row['pH 分段'] = '6.5-7.5'
+            if i % 2 == 0:
+                row['用地类型'] = '农用地'
+                # 细化农用地类型
+                agri_types = ['水田', '旱地', '果园', '茶园', '林地', '草地']
+                row['农用地细分'] = agri_types[i % len(agri_types)]
+                row['pH 分段'] = '6.5-7.5'
+            else:
+                row['用地类型'] = '建设用地第一类'
+                row['农用地细分'] = ''  # 建设用地不需要此字段
+                row['pH 分段'] = ''
         
         # 填充示例检测数据（模拟合理值）
         for indicator in config['indicator_columns'].keys():
