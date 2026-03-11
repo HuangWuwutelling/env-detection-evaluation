@@ -15,13 +15,16 @@ def show_standard_management():
     """评价标准管理页面"""
     st.header("评价标准管理")
 
-    tab1, tab2 = st.tabs(["标准列表", "添加标准"])
+    tab1, tab2, tab3 = st.tabs(["标准列表", "添加标准", "预设模板"])
 
     with tab1:
         show_standard_list()
 
     with tab2:
         show_add_standard_form()
+    
+    with tab3:
+        show_presets_templates()
 
 
 def show_standard_list():
@@ -81,6 +84,83 @@ def show_standard_list():
         else:
             st.info("暂无评价标准，请添加标准")
 
+    finally:
+        db.close()
+
+
+def show_presets_templates():
+    """显示预设标准模板"""
+    st.subheader("国家标准模板库")
+    
+    st.markdown("""
+    系统内置了常用的国家环境质量标准模板，点击即可快速导入到系统中。
+    包括：
+    - 土壤环境质量标准（GB 15618-2018、GB 36600-2018）
+    - 地表水环境质量标准（GB 3838-2002）
+    - 地下水质量标准（GB/T 14848-2017）
+    - 农田灌溉水质标准（GB 5084-2021）
+    """)
+    
+    db = SessionLocal()
+    try:
+        from services.standard_templates import STANDARD_TEMPLATES, load_template_to_db
+        
+        service = StandardService(db)
+        
+        # 获取已存在的标准编号
+        existing_standards = service.get_standards()
+        existing_codes = {s.standard_code for s in existing_standards}
+        
+        st.subheader("可导入的标准模板")
+        
+        for template in STANDARD_TEMPLATES:
+            is_exists = template["standard_code"] in existing_codes
+            
+            with st.expander(
+                f"{'✅ ' if is_exists else ''}{template['standard_name']} ({template['standard_code']})",
+                expanded=not is_exists
+            ):
+                col1, col2 = st.columns([3, 1])
+                
+                with col1:
+                    st.markdown(f"**类型**: {template['standard_type']}")
+                    st.markdown(f"**描述**: {template.get('description', '-')}")
+                    st.markdown(f"**指标数量**: {len(template['limits'])}")
+                    
+                    # 显示前 5 个指标
+                    limits_df = pd.DataFrame([
+                        {
+                            "指标": l.get('indicator', ''),
+                            "规则": l.get('operator', ''),
+                            "限值": f"{l.get('min_limit', '')} ~ {l.get('max_limit', '')}" if l.get('min_limit') and l.get('max_limit') else (f"≤ {l.get('max_limit', '')}" if l.get('max_limit') else f"≥ {l.get('min_limit', '')}"),
+                            "单位": l.get('unit', '')
+                        }
+                        for l in template['limits'][:5]
+                    ])
+                    st.dataframe(limits_df, use_container_width=True)
+                    
+                    if len(template['limits']) > 5:
+                        st.caption(f"还有{len(template['limits']) - 5}个指标...")
+                
+                with col2:
+                    if is_exists:
+                        st.success("已导入")
+                        if st.button("删除后重新导入", key=f"reimport_{template['standard_code']}"):
+                            # 删除旧标准
+                            for std in existing_standards:
+                                if std.standard_code == template["standard_code"]:
+                                    service.delete_standard(std.id)
+                                    break
+                            st.rerun()
+                    else:
+                        if st.button("导入此标准", key=f"import_{template['standard_code']}", type="primary"):
+                            try:
+                                load_template_to_db(template, db)
+                                st.success(f"标准 {template['standard_name']} 导入成功！")
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"导入失败：{str(e)}")
+        
     finally:
         db.close()
 

@@ -12,6 +12,19 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from models.database import init_db
 init_db()
 
+# 加载预设标准模板（可选）
+try:
+    from models.database import SessionLocal
+    from services.standard_templates import initialize_all_templates
+    db = SessionLocal()
+    try:
+        templates = initialize_all_templates(db)
+        print(f"已加载 {len(templates)} 个预设标准模板")
+    finally:
+        db.close()
+except Exception as e:
+    print(f"加载预设模板失败：{e}")
+
 # 页面配置
 st.set_page_config(
     page_title="环境检测数据评价系统",
