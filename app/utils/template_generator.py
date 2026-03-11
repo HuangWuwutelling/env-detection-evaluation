@@ -27,6 +27,14 @@ def get_template_columns(standard_type: str) -> Dict:
         '备注': str
     }
     
+    # 不同标准的特殊列配置
+    special_columns = {
+        '土壤': {
+            '用地类型': str,  # 农用地/建设用地第一类/建设用地第二类
+            'pH 分段': str     # pH 分段信息（<5.5, 5.5-6.5, 6.5-7.5, >7.5）
+        }
+    }
+    
     # 不同标准的检测指标列
     indicator_columns = {
         '土壤': {
@@ -139,6 +147,7 @@ def get_template_columns(standard_type: str) -> Dict:
     
     return {
         'fixed_columns': fixed_columns,
+        'special_columns': special_columns.get(standard_type, {}),
         'indicator_columns': indicator_columns.get(standard_type, {})
     }
 
@@ -158,6 +167,7 @@ def create_template_excel(standard_type: str, sample_count: int = 10) -> bytes:
     
     # 合并所有列
     all_columns = list(config['fixed_columns'].keys()) + \
+                  list(config.get('special_columns', {}).keys()) + \
                   list(config['indicator_columns'].keys())
     
     # 创建 DataFrame
@@ -175,6 +185,11 @@ def create_template_excel(standard_type: str, sample_count: int = 10) -> bytes:
         row['样品来源'] = f'采样点{i+1}'
         row['采样日期'] = pd.Timestamp.now().strftime('%Y-%m-%d')
         row['备注'] = ''
+        
+        # 填充特殊列（如土壤的用地类型）
+        if standard_type == '土壤':
+            row['用地类型'] = '农用地' if i % 2 == 0 else '建设用地第一类'
+            row['pH 分段'] = '6.5-7.5'
         
         # 填充示例检测数据（模拟合理值）
         for indicator in config['indicator_columns'].keys():
