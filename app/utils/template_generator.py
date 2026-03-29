@@ -178,45 +178,49 @@ def create_template_excel(standard_type: str = None, sample_count: int = 10) -> 
     # 创建 DataFrame
     df = pd.DataFrame(columns=all_columns)
     
-    # 添加示例数据（前几行）
+    # 添加示例数据（前几行）- 展示不同类型的样品
     example_data = []
-    for i in range(min(sample_count, 5)):
+    
+    # 定义不同类型样品的示例配置
+    sample_configs = [
+        {'样品类型': '土壤', '用地类型': '农用地', '农用地细分': '水田', 'pH 分段': '6.5-7.5'},
+        {'样品类型': '土壤', '用地类型': '农用地', '农用地细分': '果园', 'pH 分段': '5.5-6.5'},
+        {'样品类型': '土壤', '用地类型': '建设用地第一类', '农用地细分': '', 'pH 分段': ''},
+        {'样品类型': '地表水', '水质类别': 'III 类'},
+        {'样品类型': '地下水', '水质类别': 'II 类'},
+        {'样品类型': '灌溉水', '水质类别': 'I 类'}
+    ]
+    
+    for i in range(min(sample_count, len(sample_configs))):
         row = {}
+        config = sample_configs[i]
         
         # 填充固定列
         row['样品编号'] = f'S{pd.Timestamp.now().strftime("%Y%m%d")}{str(i+1).zfill(3)}'
-        row['样品名称'] = f'{standard_type or "环境"}样品{i+1}'
-        row['样品类型'] = standard_type or '土壤'
+        row['样品名称'] = f'{config["样品类型"]}样品{i+1}'
+        row['样品类型'] = config['样品类型']
         row['样品来源'] = f'采样点{i+1}'
         row['采样日期'] = pd.Timestamp.now().strftime('%Y-%m-%d')
-        row['评价标准'] = get_standard_code(row['样品类型'])  # 自动匹配标准代码
-        row['用地类型'] = ''
-        row['农用地细分'] = ''
-        row['pH 分段'] = ''
-        row['水质类别'] = ''
+        row['评价标准'] = get_standard_code(row['样品类型'])
+        row['用地类型'] = config.get('用地类型', '')
+        row['农用地细分'] = config.get('农用地细分', '')
+        row['pH 分段'] = config.get('pH 分段', '')
+        row['水质类别'] = config.get('水质类别', '')
         row['备注'] = ''
         
-        # 填充特殊列（如土壤的用地类型）
-        if row['样品类型'] == '土壤':
-            if i % 2 == 0:
-                row['用地类型'] = '农用地'
-                # 简化农用地类型：水田/果园/其他
-                agri_types = ['水田', '果园', '其他']
-                row['农用地细分'] = agri_types[i % len(agri_types)]
-                row['pH 分段'] = '6.5-7.5'
-            else:
-                row['用地类型'] = '建设用地第一类'
-                row['农用地细分'] = ''  # 建设用地不需要此字段
-                row['pH 分段'] = ''
+        # 填充示例检测数据（模拟合理值）- 根据样品类型选择对应的指标
+        sample_type_indicators = {
+            '土壤': ['pH', '镉', '汞', '砷', '铅', '铬', '铜', '镍', '锌'],
+            '地表水': ['水温', 'pH', '溶解氧', '高锰酸盐指数', 'COD', '氨氮'],
+            '地下水': ['pH', '总硬度', '溶解性总固体', '氨氮', '硝酸盐'],
+            '灌溉水': ['pH', '悬浮物', 'COD', 'BOD5', '氨氮']
+        }
         
-        # 水质类别示例（仅水环境）
-        if row['样品类型'] in ['地表水', '地下水', '灌溉水']:
-            water_classes = ['I 类', 'II 类', 'III 类', 'IV 类', 'V 类']
-            row['水质类别'] = water_classes[i % len(water_classes)]
-        
-        # 填充示例检测数据（模拟合理值）
-        for indicator in config['indicator_columns'].keys():
-            row[indicator] = get_example_value(indicator, standard_type)
+        indicators_for_type = sample_type_indicators.get(row['样品类型'], [])
+        all_indicators = config.get('indicator_columns', {})
+        for indicator in indicators_for_type:
+            if indicator in all_indicators:
+                row[indicator] = get_example_value(indicator, row['样品类型'])
         
         example_data.append(row)
     
