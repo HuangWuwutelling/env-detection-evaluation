@@ -73,6 +73,44 @@ def show_evaluation():
             
         selected_standard = standard_options[selected_standard_str]
 
+        # 如果是土壤标准，显示用地类型选择
+        land_use_type = ''
+        agri_sub_type = ''
+        ph_range = ''
+        
+        if '土壤' in selected_standard.standard_type:
+            st.subheader("3. 土壤用地类型信息")
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                land_use_type = st.selectbox(
+                    "用地类型",
+                    ['农用地', '建设用地第一类', '建设用地第二类'],
+                    help="根据 GB 36600-2018 和 GB 15618-2018 选择"
+                )
+            
+            with col2:
+                if land_use_type == '农用地':
+                    agri_sub_type = st.selectbox(
+                        "农用地细分",
+                        ['水田', '果园', '其他'],
+                        help="GB 15618-2018 规定的农用地类型"
+                    )
+                else:
+                    agri_sub_type = ''
+                    st.selectbox("农用地细分", [''], disabled=True)
+            
+            with col3:
+                if land_use_type == '农用地':
+                    ph_range = st.selectbox(
+                        "pH 分段",
+                        ['<5.5', '5.5-6.5', '6.5-7.5', '>7.5'],
+                        help="根据实际 pH 值选择对应范围"
+                    )
+                else:
+                    ph_range = ''
+                    st.selectbox("pH 分段", [''], disabled=True)
+
         # 显示标准信息
         with st.expander("标准限值预览"):
             limits = json.loads(selected_standard.limits) if selected_standard.limits else []
@@ -88,7 +126,7 @@ def show_evaluation():
             st.dataframe(limit_df, use_container_width=True)
 
         # 执行评价
-        st.subheader("3. 执行评价")
+        st.subheader("4. 执行评价")
         
         if st.button("开始评价", type="primary"):
             try:
@@ -102,7 +140,10 @@ def show_evaluation():
                 # 使用评价引擎进行评价
                 overall_result, details = EvaluationEngine.evaluate_sample(
                     detection_data,
-                    limits
+                    limits,
+                    land_use_type if '土壤' in selected_standard.standard_type else '',
+                    agri_sub_type if '土壤' in selected_standard.standard_type else '',
+                    ph_range if '土壤' in selected_standard.standard_type else ''
                 )
 
                 # 保存评价结果

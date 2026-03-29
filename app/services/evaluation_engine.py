@@ -2,7 +2,8 @@
 评价引擎 - 核心逻辑
 """
 import json
-from typing import List, Dict
+from typing import List, Dict, Optional
+from services.soil_limit_matcher import SoilLimitMatcher
 
 
 class EvaluationEngine:
@@ -80,7 +81,10 @@ class EvaluationEngine:
     @staticmethod
     def evaluate_sample(
         detection_data: Dict[str, float],
-        limits: List[dict]
+        limits: List[dict],
+        land_use_type: str = '',  # 用地类型（农用地/建设用地第一类/建设用地第二类）
+        agri_sub_type: str = '',   # 农用地细分（水田/果园/其他）
+        ph_range: str = ''         # pH 分段（<5.5, 5.5-6.5, 6.5-7.5, >7.5）
     ) -> tuple:
         """
         评价整个样品
@@ -88,6 +92,9 @@ class EvaluationEngine:
         Args:
             detection_data: 检测数据，如 {"pH": 7.2, "COD": 45.5}
             limits: 限值配置列表
+            land_use_type: 用地类型（仅土壤需要）
+            agri_sub_type: 农用地细分类型（仅农用地需要）
+            ph_range: pH 分段（仅农用地需要）
         
         Returns:
             (总体评价结果，评价详情列表)
@@ -100,7 +107,30 @@ class EvaluationEngine:
             value = detection_data.get(indicator)
 
             if value is not None:
-                # 评价该指标
+                # 土壤特殊处理：根据用地类型匹配限值
+                if land_use_type in ['农用地', '建设用地第一类', '建设用地第二类']:
+                    soil_limit = SoilLimitMatcher.get_soil_limit(
+                        indicator, land_use_type, agri_sub_type, ph_range
+                    )
+                    
+                    if soil_limit is not None:
+                        # 使用匹配的限值进行评价
+                        result = EvaluationEngine.evaluate_indicator(
+                            indicator, value,
+                            {"indicator": indicator, "operator": "<=", "max_limit": soil_limit, "unit": "mg/kg"}
+                        )
+                        # 添加额外信息
+                        result['land_use_type'] = land_use_type
+                        if land_use_type == '农用地':
+                            result['agri_sub_type'] = agri_sub_type
+                            result['ph_range'] = ph_range
+                        
+                        details.append(result)
+                        if result["result"] != "达标":
+                            has_exceedance = True
+                        continue
+                
+                # 非土壤或使用默认限值配置
                 result = EvaluationEngine.evaluate_indicator(
                     indicator, value, limit_config
                 )
