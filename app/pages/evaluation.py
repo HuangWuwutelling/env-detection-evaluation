@@ -24,132 +24,291 @@ def show_evaluation():
         standard_service = StandardService(db)
         result_service = EvaluationResultService(db)
 
-        # 选择样品
-        st.subheader("1. 选择样品")
-        samples = sample_service.get_samples(limit=100)
-        
-        if not samples:
-            st.warning("暂无样品，请先添加或导入样品")
-            return
-
-        sample_options = {f"{s.sample_no} - {s.sample_name}": s for s in samples}
-        selected_sample_str = st.selectbox(
-            "选择要评价的样品",
-            list(sample_options.keys())
+        # 选择评价模式
+        st.subheader("1. 选择评价模式")
+        eval_mode = st.radio(
+            "选择评价方式",
+            ["单个样品评价", "批量评价"],
+            horizontal=True
         )
         
-        if not selected_sample_str:
-            return
-            
-        selected_sample = sample_options[selected_sample_str]
+        if eval_mode == "单个样品评价":
+            show_single_evaluation(sample_service, standard_service, result_service)
+        else:
+            show_batch_evaluation(sample_service, standard_service, result_service)
+    finally:
+        db.close()
 
-        # 显示样品信息
-        with st.expander("样品信息预览"):
-            col1, col2 = st.columns(2)
-            with col1:
-                st.markdown(f"**样品编号**: {selected_sample.sample_no}")
-                st.markdown(f"**样品名称**: {selected_sample.sample_name}")
-            
-            with col2:
-                st.markdown(f"**采样日期**: {selected_sample.collection_date.strftime('%Y-%m-%d') if selected_sample.collection_date else '-'}")
-                st.markdown(f"**检测日期**: {selected_sample.detection_date.strftime('%Y-%m-%d') if selected_sample.detection_date else '-'}")
 
-        # 选择评价标准
-        st.subheader("2. 选择评价标准")
-        standards = standard_service.get_standards(limit=100)
+def show_single_evaluation(sample_service, standard_service, result_service):
+    """单个样品评价"""
+    # 选择样品
+    st.subheader("2. 选择样品")
+    samples = sample_service.get_samples(limit=100)
+    
+    if not samples:
+        st.warning("暂无样品，请先添加或导入样品")
+        return
+
+    sample_options = {f"{s.sample_no} - {s.sample_name}": s for s in samples}
+    selected_sample_str = st.selectbox(
+        "选择要评价的样品",
+        list(sample_options.keys())
+    )
+    
+    if not selected_sample_str:
+        return
         
-        if not standards:
-            st.warning("暂无评价标准，请先添加标准")
-            return
+    selected_sample = sample_options[selected_sample_str]
 
-        standard_options = {f"{s.standard_name} ({s.standard_code or '无编号'})": s for s in standards}
-        selected_standard_str = st.selectbox(
-            "选择评价标准",
-            list(standard_options.keys())
-        )
+    # 显示样品信息
+    with st.expander("样品信息预览"):
+        col1, col2 = st.columns(2)
+        with col1:
+            st.markdown(f"**样品编号**: {selected_sample.sample_no}")
+            st.markdown(f"**样品名称**: {selected_sample.sample_name}")
         
-        if not selected_standard_str:
-            return
-            
-        selected_standard = standard_options[selected_standard_str]
+        with col2:
+            st.markdown(f"**采样日期**: {selected_sample.collection_date.strftime('%Y-%m-%d') if selected_sample.collection_date else '-'}")
+            st.markdown(f"**检测日期**: {selected_sample.detection_date.strftime('%Y-%m-%d') if selected_sample.detection_date else '-'}")
 
-        # 如果是土壤标准，显示用地类型选择
-        land_use_type = ''
-        agri_sub_type = ''
-        ph_range = ''
+    # 选择评价标准
+    st.subheader("3. 选择评价标准")
+    standards = standard_service.get_standards(limit=100)
+    
+    if not standards:
+        st.warning("暂无评价标准，请先添加标准")
+        return
+
+    standard_options = {f"{s.standard_name} ({s.standard_code or '无编号'})": s for s in standards}
+    selected_standard_str = st.selectbox(
+        "选择评价标准",
+        list(standard_options.keys())
+    )
+    
+    if not selected_standard_str:
+        return
         
-        if '土壤' in selected_standard.standard_type:
-            st.subheader("3. 土壤用地类型信息")
-            col1, col2, col3 = st.columns(3)
-            
-            with col1:
-                land_use_type = st.selectbox(
-                    "用地类型",
-                    ['农用地', '建设用地第一类', '建设用地第二类'],
-                    help="根据 GB 36600-2018 和 GB 15618-2018 选择"
+    selected_standard = standard_options[selected_standard_str]
+
+    # 如果是土壤标准，显示用地类型选择
+    land_use_type = ''
+    agri_sub_type = ''
+    ph_range = ''
+    
+    if '土壤' in selected_standard.standard_type:
+        st.subheader("4. 土壤用地类型信息")
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            land_use_type = st.selectbox(
+                "用地类型",
+                ['农用地', '建设用地第一类', '建设用地第二类'],
+                help="根据 GB 36600-2018 和 GB 15618-2018 选择"
+            )
+        
+        with col2:
+            if land_use_type == '农用地':
+                agri_sub_type = st.selectbox(
+                    "农用地细分",
+                    ['水田', '果园', '其他'],
+                    help="GB 15618-2018 规定的农用地类型"
                 )
-            
-            with col2:
-                if land_use_type == '农用地':
-                    agri_sub_type = st.selectbox(
-                        "农用地细分",
-                        ['水田', '果园', '其他'],
-                        help="GB 15618-2018 规定的农用地类型"
-                    )
-                else:
-                    agri_sub_type = ''
-                    st.selectbox("农用地细分", [''], disabled=True)
-            
-            with col3:
-                if land_use_type == '农用地':
-                    ph_range = st.selectbox(
-                        "pH 分段",
-                        ['<5.5', '5.5-6.5', '6.5-7.5', '>7.5'],
-                        help="根据实际 pH 值选择对应范围"
-                    )
-                else:
-                    ph_range = ''
-                    st.selectbox("pH 分段", [''], disabled=True)
-
-        # 显示标准信息
-        with st.expander("标准限值预览"):
-            limits = json.loads(selected_standard.limits) if selected_standard.limits else []
-            st.markdown(f"**标准名称**: {selected_standard.standard_name}")
-            st.markdown(f"**评价指标数量**: {len(limits)}")
-            
-            limit_df = pd.DataFrame([{
-                "指标": l.get('indicator', ''),
-                "规则": l.get('operator', ''),
-                "限值": f"{l.get('min_limit', '')} ~ {l.get('max_limit', '')}",
-                "单位": l.get('unit', '')
-            } for l in limits])
-            st.dataframe(limit_df, use_container_width=True)
-
-        # 执行评价
-        st.subheader("4. 执行评价")
+            else:
+                agri_sub_type = ''
+                st.selectbox("农用地细分", [''], disabled=True)
         
-        if st.button("开始评价", type="primary"):
-            try:
+        with col3:
+            if land_use_type == '农用地':
+                ph_range = st.selectbox(
+                    "pH 分段",
+                    ['<5.5', '5.5-6.5', '6.5-7.5', '>7.5'],
+                    help="根据实际 pH 值选择对应范围"
+                )
+            else:
+                ph_range = ''
+                st.selectbox("pH 分段", [''], disabled=True)
+
+    # 显示标准信息
+    with st.expander("标准限值预览"):
+        limits = json.loads(selected_standard.limits) if selected_standard.limits else []
+        st.markdown(f"**标准名称**: {selected_standard.standard_name}")
+        st.markdown(f"**评价指标数量**: {len(limits)}")
+        
+        limit_df = pd.DataFrame([{
+            "指标": l.get('indicator', ''),
+            "规则": l.get('operator', ''),
+            "限值": f"{l.get('min_limit', '')} ~ {l.get('max_limit', '')}",
+            "单位": l.get('unit', '')
+        } for l in limits])
+        st.dataframe(limit_df, use_container_width=True)
+
+    # 执行评价
+    st.subheader("5. 执行评价")
+    
+    if st.button("开始评价", type="primary"):
+        try:
+            # 获取样品检测数据
+            detection_data = json.loads(selected_sample.detection_data) if selected_sample.detection_data else {}
+            
+            if not detection_data:
+                st.error("该样品没有检测数据")
+                return
+
+            # 使用评价引擎进行评价
+            overall_result, details = EvaluationEngine.evaluate_sample(
+                detection_data,
+                limits,
+                land_use_type if '土壤' in selected_standard.standard_type else '',
+                agri_sub_type if '土壤' in selected_standard.standard_type else '',
+                ph_range if '土壤' in selected_standard.standard_type else ''
+            )
+
+            # 保存评价结果
+            result_data = {
+                "sample_id": selected_sample.id,
+                "sample_no": selected_sample.sample_no,
+                "standard_id": selected_standard.id,
+                "standard_name": selected_standard.standard_name,
+                "evaluation_details": json.dumps(details, ensure_ascii=False),
+                "overall_result": overall_result,
+                "conclusion": f"根据{selected_standard.standard_name}评价，该样品{overall_result}"
+            }
+            
+            result = result_service.create_result(result_data)
+
+            # 显示评价结果
+            st.success("评价完成！")
+            show_evaluation_result(details, overall_result)
+
+        except Exception as e:
+            st.error(f"评价失败：{str(e)}")
+
+
+def show_batch_evaluation(sample_service, standard_service, result_service):
+    """批量评价"""
+    st.subheader("2. 选择多个样品")
+    samples = sample_service.get_samples(limit=100)
+    
+    if not samples:
+        st.warning("暂无样品，请先添加或导入样品")
+        return
+    
+    # 使用多选框选择多个样品
+    sample_options = {f"{s.sample_no} - {s.sample_name}": s for s in samples}
+    selected_samples_str = st.multiselect(
+        "选择要评价的样品（可多选）",
+        list(sample_options.keys()),
+        help="按住 Ctrl 键可以选择多个样品"
+    )
+    
+    if not selected_samples_str:
+        return
+    
+    selected_samples = [sample_options[s] for s in selected_samples_str]
+    st.info(f"已选择 {len(selected_samples)} 个样品")
+    
+    # 选择评价标准
+    st.subheader("3. 选择评价标准")
+    standards = standard_service.get_standards(limit=100)
+    
+    if not standards:
+        st.warning("暂无评价标准，请先添加标准")
+        return
+    
+    standard_options = {f"{s.standard_name} ({s.standard_code or '无编号'})": s for s in standards}
+    selected_standard_str = st.selectbox(
+        "选择评价标准",
+        list(standard_options.keys()),
+        key="batch_standard"
+    )
+    
+    if not selected_standard_str:
+        return
+    
+    selected_standard = standard_options[selected_standard_str]
+    limits = json.loads(selected_standard.limits) if selected_standard.limits else []
+    
+    # 土壤参数（如果需要）
+    land_use_type = ''
+    agri_sub_type = ''
+    ph_range = ''
+    water_class = ''
+    
+    if '土壤' in selected_standard.standard_type:
+        st.subheader("4. 土壤用地类型信息（所有样品将使用相同的设置）")
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            land_use_type = st.selectbox(
+                "用地类型",
+                ['农用地', '建设用地第一类', '建设用地第二类'],
+                key="batch_land_use"
+            )
+        
+        with col2:
+            if land_use_type == '农用地':
+                agri_sub_type = st.selectbox(
+                    "农用地细分",
+                    ['水田', '果园', '其他'],
+                    key="batch_agri_type"
+                )
+        
+        with col3:
+            if land_use_type == '农用地':
+                ph_range = st.selectbox(
+                    "pH 分段",
+                    ['<5.5', '5.5-6.5', '6.5-7.5', '>7.5'],
+                    key="batch_ph_range"
+                )
+    elif selected_standard.standard_type in ['地表水', '地下水', '灌溉水']:
+        st.subheader("4. 水质类别（所有样品将使用相同的设置）")
+        water_class = st.selectbox(
+            "水质类别",
+            ['I 类', 'II 类', 'III 类', 'IV 类', 'V 类'],
+            key="batch_water_class"
+        )
+    
+    # 执行批量评价
+    st.subheader("5. 执行批量评价")
+    
+    if st.button("开始批量评价", type="primary"):
+        try:
+            results_summary = []
+            
+            progress_bar = st.progress(0)
+            status_text = st.empty()
+            
+            for i, sample in enumerate(selected_samples):
+                status_text.text(f"正在评价第 {i+1}/{len(selected_samples)} 个样品：{sample.sample_no}")
+                
                 # 获取样品检测数据
-                detection_data = json.loads(selected_sample.detection_data) if selected_sample.detection_data else {}
+                detection_data = json.loads(sample.detection_data) if sample.detection_data else {}
                 
                 if not detection_data:
-                    st.error("该样品没有检测数据")
-                    return
-
+                    results_summary.append({
+                        "样品编号": sample.sample_no,
+                        "样品名称": sample.sample_name,
+                        "结果": "失败",
+                        "原因": "无检测数据"
+                    })
+                    progress_bar.progress((i + 1) / len(selected_samples))
+                    continue
+                
                 # 使用评价引擎进行评价
                 overall_result, details = EvaluationEngine.evaluate_sample(
                     detection_data,
                     limits,
                     land_use_type if '土壤' in selected_standard.standard_type else '',
                     agri_sub_type if '土壤' in selected_standard.standard_type else '',
-                    ph_range if '土壤' in selected_standard.standard_type else ''
+                    ph_range if '土壤' in selected_standard.standard_type else '',
+                    water_class
                 )
-
+                
                 # 保存评价结果
                 result_data = {
-                    "sample_id": selected_sample.id,
-                    "sample_no": selected_sample.sample_no,
+                    "sample_id": sample.id,
+                    "sample_no": sample.sample_no,
                     "standard_id": selected_standard.id,
                     "standard_name": selected_standard.standard_name,
                     "evaluation_details": json.dumps(details, ensure_ascii=False),
@@ -157,17 +316,40 @@ def show_evaluation():
                     "conclusion": f"根据{selected_standard.standard_name}评价，该样品{overall_result}"
                 }
                 
-                result = result_service.create_result(result_data)
-
-                # 显示评价结果
-                st.success("评价完成！")
-                show_evaluation_result(details, overall_result)
-
-            except Exception as e:
-                st.error(f"评价失败：{str(e)}")
-
-    finally:
-        db.close()
+                result_service.create_result(result_data)
+                
+                results_summary.append({
+                    "样品编号": sample.sample_no,
+                    "样品名称": sample.sample_name,
+                    "结果": overall_result,
+                    "超标项数": sum(1 for d in details if d.get('result') != '达标' and d.get('result') != '未检测')
+                })
+                
+                progress_bar.progress((i + 1) / len(selected_samples))
+            
+            status_text.text("批量评价完成！")
+            
+            # 显示汇总结果
+            st.success(f"批量评价完成！共评价 {len(selected_samples)} 个样品")
+            
+            st.subheader("评价结果汇总")
+            results_df = pd.DataFrame(results_summary)
+            st.dataframe(results_df, use_container_width=True)
+            
+            # 统计信息
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                total = len(results_summary)
+                st.metric("总样品数", total)
+            with col2:
+                passed = sum(1 for r in results_summary if r.get('结果') == '达标')
+                st.metric("达标样品数", passed)
+            with col3:
+                failed = sum(1 for r in results_summary if r.get('结果') == '超标')
+                st.metric("超标样品数", failed)
+            
+        except Exception as e:
+            st.error(f"批量评价失败：{str(e)}")
 
 
 def show_evaluation_result(details: list, overall_result: str):
