@@ -13,7 +13,9 @@ class EvaluationEngine:
     def evaluate_indicator(
         indicator_name: str,
         value: float,
-        limit_config: dict
+        limit_config: dict,
+        screening_value: Optional[float] = None,  # 筛选值
+        control_value: Optional[float] = None     # 管制值
     ) -> dict:
         """
         评价单个指标
@@ -29,6 +31,8 @@ class EvaluationEngine:
                     "unit": "无量纲",
                     "operator": "between"
                 }
+            screening_value: 风险筛选值（土壤专用）
+            control_value: 风险管制值（土壤专用）
         
         Returns:
             评价结果字典
@@ -38,7 +42,8 @@ class EvaluationEngine:
             "value": value,
             "unit": limit_config.get("unit", ""),
             "result": "达标",
-            "remark": ""
+            "remark": "",
+            "exceed_ratio": 0.0  # 超标倍数
         }
 
         # 添加限值信息
@@ -55,14 +60,20 @@ class EvaluationEngine:
             max_limit = limit_config.get("max_limit")
             if max_limit is not None and value > max_limit:
                 result["result"] = "超标"
-                result["remark"] = f"超标倍数：{(value - max_limit) / max_limit:.2f}"
+                # 计算超标倍数
+                exceed_ratio = (value - max_limit) / max_limit
+                result["exceed_ratio"] = round(exceed_ratio, 2)
+                result["remark"] = f"超标倍数：{exceed_ratio:.2f}"
 
         elif operator == ">=":
             # 大于等于限值为达标（适用于某些需要达到最低标准的指标）
             min_limit = limit_config.get("min_limit")
             if min_limit is not None and value < min_limit:
                 result["result"] = "不达标"
-                result["remark"] = f"低于标准值：{min_limit - value}"
+                # 计算未达标比例
+                ratio = (min_limit - value) / min_limit
+                result["exceed_ratio"] = round(ratio, 2)
+                result["remark"] = f"低于标准值：{min_limit - value} (比例：{ratio:.2f})"
 
         elif operator == "between":
             # 在区间内为达标
@@ -72,9 +83,15 @@ class EvaluationEngine:
                 if value < min_limit or value > max_limit:
                     result["result"] = "超标"
                     if value < min_limit:
-                        result["remark"] = f"低于下限：{min_limit - value}"
+                        diff = min_limit - value
+                        ratio = diff / min_limit
+                        result["exceed_ratio"] = round(ratio, 2)
+                        result["remark"] = f"低于下限：{diff} (比例：{ratio:.2f})"
                     else:
-                        result["remark"] = f"超出上限：{value - max_limit}"
+                        diff = value - max_limit
+                        ratio = diff / max_limit
+                        result["exceed_ratio"] = round(ratio, 2)
+                        result["remark"] = f"超出上限：{diff} (超标倍数：{ratio:.2f})"
 
         return result
 
@@ -107,26 +124,48 @@ class EvaluationEngine:
             value = detection_data.get(indicator)
 
             if value is not None:
-                # 土壤特殊处理：根据用地类型匹配限值
+                # 土壤特殊处理：根据用地类型匹配筛选值和管制值
                 if land_use_type in ['农用地', '建设用地第一类', '建设用地第二类']:
-                    soil_limit = SoilLimitMatcher.get_soil_limit(
+                    soil_limits = SoilLimitMatcher.get_soil_limit(
                         indicator, land_use_type, agri_sub_type, ph_range
                     )
                     
-                    if soil_limit is not None:
-                        # 使用匹配的限值进行评价
+                    if soil_limits is not None:
+                        screening_val, control_val = soil_limits
+                        
+                        # 使用筛选值进行评价
                         result = EvaluationEngine.evaluate_indicator(
                             indicator, value,
-                            {"indicator": indicator, "operator": "<=", "max_limit": soil_limit, "unit": "mg/kg"}
+                            {"indicator": indicator, "operator": "<=", "max_limit": screening_val, "unit": "mg/kg"},
+                            screening_value=screening_val,
+                            control_value=control_val
                         )
+                        
+                        # 根据超标程度判断风险等级
+                        if value > screening_val:
+                            if value > control_val:
+                                # 超过管制值，高风险
+                                result["result"] = "超标（高风险）"
+                                result["risk_level"] = "高风险"
+                                result["remark"] = f"超过管制值！超标倍数：{result['exceed_ratio']:.2f}"
+                            else:
+                                # 超过筛选值但未超管制值，中风险
+                                result["result"] = "超标（中风险）"
+                                result["risk_level"] = "中风险"
+                                result["remark"] = f"超过筛选值，需开展详细调查。超标倍数：{result['exceed_ratio']:.2f}"
+                        else:
+                            result["risk_level"] = "低风险"
+                        
                         # 添加额外信息
                         result['land_use_type'] = land_use_type
+                        result['screening_value'] = screening_val
+                        result['control_value'] = control_val
                         if land_use_type == '农用地':
                             result['agri_sub_type'] = agri_sub_type
                             result['ph_range'] = ph_range
                         
                         details.append(result)
-                        if result["result"] != "达标":
+                        if result["result"] != "达标" and "低风险" not in result.get("risk_level", ""):
                             has_exceedance = True
                         continue
                 
