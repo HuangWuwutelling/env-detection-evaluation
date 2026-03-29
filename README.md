@@ -39,28 +39,92 @@
 
 ## 快速开始
 
-### 1. 安装依赖
+### 💻 本地运行（当前开发环境）
+
+如果您使用的是当前开发者的电脑（Windows 11，已配置 Python 环境和 GitHub），可以直接运行：
 
 ```bash
-# 创建虚拟环境（可选）
+# 1. 进入项目目录
+cd "C:\Users\zaoquan\Downloads\env-detection-evaluation"
+
+# 2. 激活虚拟环境
+.\venv\Scripts\Activate
+
+# 3. 启动应用
+streamlit run app\main.py
+```
+
+系统将在 **http://localhost:8501** 自动打开浏览器。
+
+---
+
+### 📥 其他人安装运行（通用方法）
+
+#### 前置要求
+- Python 3.10 或更高版本
+- Git（用于克隆代码）
+
+#### 步骤 1：获取代码
+
+**方式 A - 从 GitHub 克隆（推荐）**
+```bash
+# 克隆项目到本地
+git clone https://github.com/HuangWuwutelling/env-detection-evaluation.git
+
+# 进入项目目录
+cd env-detection-evaluation
+```
+
+**方式 B - 下载 ZIP 文件**
+1. 访问项目页面：https://github.com/HuangWuwutelling/env-detection-evaluation
+2. 点击 "Code" → "Download ZIP"
+3. 解压到本地文件夹
+
+#### 步骤 2：创建并激活虚拟环境
+
+**Windows 系统：**
+```bash
+# 创建虚拟环境
 python -m venv venv
 
 # 激活虚拟环境
-# Windows:
 .\venv\Scripts\activate
+```
 
-# 安装依赖包
+**macOS / Linux 系统：**
+```bash
+# 创建虚拟环境
+python3 -m venv venv
+
+# 激活虚拟环境
+source venv/bin/activate
+```
+
+#### 步骤 3：安装依赖包
+
+```bash
+# 安装所有依赖
 pip install -r requirements.txt
 ```
 
-### 2. 运行系统
+依赖包清单：
+- streamlit (Web 框架)
+- sqlalchemy (数据库 ORM)
+- pandas (数据处理)
+- openpyxl (Excel 处理)
+
+#### 步骤 4：启动应用
 
 ```bash
-cd app
-streamlit run main.py
+# 在项目根目录下运行
+streamlit run app/main.py
 ```
 
-系统将在 http://localhost:8501 启动
+#### 步骤 5：访问系统
+
+打开浏览器访问：**http://localhost:8501**
+
+---
 
 ### 3. 使用流程
 
@@ -71,6 +135,8 @@ streamlit run main.py
 3. **执行评价** - 在「数据评价」模块选择样品和标准进行评价
    - 🌾 土壤样品需选择用地类型和 pH 分段
 4. **查看结果** - 在「评价结果」模块查看和导出评价报告
+
+---
 
 ## 项目结构
 
