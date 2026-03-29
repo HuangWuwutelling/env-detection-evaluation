@@ -73,20 +73,23 @@ def show_sample_list():
                 selection_mode="single",
                 key="sample_list"
             )
+            
+            # 获取选中的行
+            selected_rows = st.session_state.get("sample_list", {}).get("selection", {}).get("rows", [])
 
             # 操作按钮
             col1, col2, col3 = st.columns(3)
             with col1:
                 if st.button("查看详情", key="view_sample"):
-                    if selected_row and len(selected_row["selection"]["rows"]) > 0:
-                        row_idx = selected_row["selection"]["rows"][0]
+                    if selected_rows and len(selected_rows) > 0:
+                        row_idx = selected_rows[0]
                         sample = samples[row_idx]
                         show_sample_detail(sample)
             
             with col2:
                 if st.button("删除样品", key="delete_sample"):
-                    if selected_row and len(selected_row["selection"]["rows"]) > 0:
-                        row_idx = selected_row["selection"]["rows"][0]
+                    if selected_rows and len(selected_rows) > 0:
+                        row_idx = selected_rows[0]
                         sample = samples[row_idx]
                         if service.delete_sample(sample.id):
                             st.success(f"样品 {sample.sample_no} 已删除")
