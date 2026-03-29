@@ -142,10 +142,20 @@ def get_template_columns(standard_type: str = None) -> Dict:
         }
     }
     
+    # 如果指定了标准类型，只返回该类型的指标；否则返回所有指标
+    if standard_type:
+        indicators = indicator_columns.get(standard_type, {})
+    else:
+        # 统一模板：合并所有类型的指标
+        all_indicators = {}
+        for indicators in indicator_columns.values():
+            all_indicators.update(indicators)
+        indicators = all_indicators
+    
     # 返回时合并所有列（不再区分 special_columns）
     return {
         'fixed_columns': fixed_columns,
-        'indicator_columns': indicator_columns.get(standard_type, {})
+        'indicator_columns': indicators
     }
 
 
