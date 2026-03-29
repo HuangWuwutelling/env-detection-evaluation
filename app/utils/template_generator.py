@@ -1,42 +1,38 @@
 """
 数据导入模板生成工具
-为不同评价标准生成对应的 Excel 导入模板
+统一的 Excel 导入模板，支持所有环境检测类型
 """
 import pandas as pd
 import io
 from typing import List, Dict
 
 
-def get_template_columns(standard_type: str) -> Dict:
+def get_template_columns(standard_type: str = None) -> Dict:
     """
-    根据标准类型返回模板列配置
+    返回统一的模板列配置
     
     Args:
-        standard_type: 标准类型（土壤、地表水、地下水、灌溉水）
+        standard_type: 标准类型（可选，用于兼容旧代码）
     
     Returns:
         包含固定列和动态指标列的配置字典
     """
-    # 所有模板都需要的固定列
+    # 统一模板的固定列（所有类型都需要）
     fixed_columns = {
         '样品编号': str,
         '样品名称': str,
-        '样品类型': str,
+        '样品类型': str,  # 土壤、地表水、地下水、灌溉水、空气等
         '样品来源': str,
         '采样日期': str,
+        '评价标准': str,  # GB 15618-2018、GB 3838-2002 等
+        '用地类型': str,  # 农用地/建设用地第一类/建设用地第二类（土壤专用）
+        '农用地细分': str,  # 水田/果园/其他（仅农用地需要）
+        'pH 分段': str,  # <5.5, 5.5-6.5, 6.5-7.5, >7.5（土壤专用）
+        '水质类别': str,  # I 类、II 类、III 类、IV 类、V 类（水环境专用）
         '备注': str
     }
     
-    # 不同标准的特殊列配置
-    special_columns = {
-        '土壤': {
-            '用地类型': str,  # 农用地/建设用地第一类/建设用地第二类
-            '农用地细分': str,  # 水田/旱地/果园/茶园/林地/草地等
-            'pH 分段': str     # pH 分段信息（<5.5, 5.5-6.5, 6.5-7.5, >7.5）
-        }
-    }
-    
-    # 不同标准的检测指标列
+    # 不同标准的检测指标列（所有可能用到的指标）
     indicator_columns = {
         '土壤': {
             'pH': float,
@@ -146,19 +142,19 @@ def get_template_columns(standard_type: str) -> Dict:
         }
     }
     
+    # 返回时合并所有列（不再区分 special_columns）
     return {
         'fixed_columns': fixed_columns,
-        'special_columns': special_columns.get(standard_type, {}),
         'indicator_columns': indicator_columns.get(standard_type, {})
     }
 
 
-def create_template_excel(standard_type: str, sample_count: int = 10) -> bytes:
+def create_template_excel(standard_type: str = None, sample_count: int = 10) -> bytes:
     """
-    创建指定标准类型的 Excel 模板
+    创建统一的 Excel 模板（支持所有类型）
     
     Args:
-        standard_type: 标准类型
+        standard_type: 标准类型（可选，用于过滤指标列）
         sample_count: 示例数据行数
     
     Returns:
@@ -166,10 +162,8 @@ def create_template_excel(standard_type: str, sample_count: int = 10) -> bytes:
     """
     config = get_template_columns(standard_type)
     
-    # 合并所有列
-    all_columns = list(config['fixed_columns'].keys()) + \
-                  list(config.get('special_columns', {}).keys()) + \
-                  list(config['indicator_columns'].keys())
+    # 合并所有列：固定列 + 指标列
+    all_columns = list(config['fixed_columns'].keys()) + list(config['indicator_columns'].keys())
     
     # 创建 DataFrame
     df = pd.DataFrame(columns=all_columns)
@@ -181,14 +175,19 @@ def create_template_excel(standard_type: str, sample_count: int = 10) -> bytes:
         
         # 填充固定列
         row['样品编号'] = f'S{pd.Timestamp.now().strftime("%Y%m%d")}{str(i+1).zfill(3)}'
-        row['样品名称'] = f'{standard_type}样品{i+1}'
-        row['样品类型'] = standard_type
+        row['样品名称'] = f'{standard_type or "环境"}样品{i+1}'
+        row['样品类型'] = standard_type or '土壤'
         row['样品来源'] = f'采样点{i+1}'
         row['采样日期'] = pd.Timestamp.now().strftime('%Y-%m-%d')
+        row['评价标准'] = get_standard_code(row['样品类型'])  # 自动匹配标准代码
+        row['用地类型'] = ''
+        row['农用地细分'] = ''
+        row['pH 分段'] = ''
+        row['水质类别'] = ''
         row['备注'] = ''
         
         # 填充特殊列（如土壤的用地类型）
-        if standard_type == '土壤':
+        if row['样品类型'] == '土壤':
             if i % 2 == 0:
                 row['用地类型'] = '农用地'
                 # 简化农用地类型：水田/果园/其他
@@ -199,6 +198,11 @@ def create_template_excel(standard_type: str, sample_count: int = 10) -> bytes:
                 row['用地类型'] = '建设用地第一类'
                 row['农用地细分'] = ''  # 建设用地不需要此字段
                 row['pH 分段'] = ''
+        
+        # 水质类别示例（仅水环境）
+        if row['样品类型'] in ['地表水', '地下水', '灌溉水']:
+            water_classes = ['I 类', 'II 类', 'III 类', 'IV 类', 'V 类']
+            row['水质类别'] = water_classes[i % len(water_classes)]
         
         # 填充示例检测数据（模拟合理值）
         for indicator in config['indicator_columns'].keys():
@@ -326,10 +330,33 @@ def create_all_templates() -> Dict[str, bytes]:
 # 使用示例
 if __name__ == "__main__":
     # 生成单个模板
-    excel_data = create_template_excel('地表水')
-    print(f"模板大小：{len(excel_data)} bytes")
+    templates = create_all_templates()
+    
+    # 或者生成统一模板（包含所有指标）
+    unified_template = create_template_excel(None)
+    print("\n✅ 已生成统一模板（包含所有环境检测类型）")
     
     # 保存到本地测试
-    with open('地表水样品导入模板.xlsx', 'wb') as f:
-        f.write(excel_data)
-    print("模板已保存为：地表水样品导入模板.xlsx")
+    with open('统一环境检测模板.xlsx', 'wb') as f:
+        f.write(unified_template)
+    print("模板已保存为：统一环境检测模板.xlsx")
+
+
+def get_standard_code(sample_type: str) -> str:
+    """
+    根据样品类型返回对应的国家标准代码
+    
+    Args:
+        sample_type: 样品类型
+    
+    Returns:
+        国家标准代码
+    """
+    standard_map = {
+        '土壤': 'GB 15618-2018',
+        '地表水': 'GB 3838-2002',
+        '地下水': 'GB/T 14848-2017',
+        '灌溉水': 'GB 5084-2021',
+        '空气': 'GB 3095-2012'
+    }
+    return standard_map.get(sample_type, '')

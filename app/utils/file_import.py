@@ -31,7 +31,7 @@ def read_csv_file(file_path: str) -> pd.DataFrame:
 
 def parse_sample_data(df: pd.DataFrame) -> List[Dict]:
     """
-    将 DataFrame 解析为样品数据列表
+    将 DataFrame 解析为样品数据列表（支持统一模板）
     
     期望的列名：
     - 样品编号 (必需)
@@ -39,6 +39,11 @@ def parse_sample_data(df: pd.DataFrame) -> List[Dict]:
     - 样品类型
     - 样品来源
     - 采样日期
+    - 评价标准
+    - 用地类型
+    - 农用地细分
+    - pH 分段
+    - 水质类别
     - 检测指标... (动态列)
     
     Returns:
@@ -49,6 +54,11 @@ def parse_sample_data(df: pd.DataFrame) -> List[Dict]:
             "sample_type": "类型",
             "source": "来源",
             "collection_date": datetime,
+            "standard_code": "GB 编号",
+            "land_use_type": "用地类型",
+            "agri_sub_type": "农用地细分",
+            "ph_range": "pH 分段",
+            "water_class": "水质类别",
             "detection_data": json_string,
             "remark": ""
         }
@@ -70,9 +80,15 @@ def parse_sample_data(df: pd.DataFrame) -> List[Dict]:
             sample_data = {
                 "sample_no": str(row['样品编号']).strip(),
                 "sample_name": str(row['样品名称']).strip(),
-                "sample_type": str(row.get('样品类型', '')),
-                "source": str(row.get('样品来源', '')),
-                "remark": str(row.get('备注', ''))
+                "sample_type": str(row.get('样品类型', '')).strip(),
+                "source": str(row.get('样品来源', '')).strip(),
+                "remark": str(row.get('备注', '')).strip(),
+                # 新增字段
+                "standard_code": str(row.get('评价标准', '')).strip() if pd.notna(row.get('评价标准')) else '',
+                "land_use_type": str(row.get('用地类型', '')).strip() if pd.notna(row.get('用地类型')) else '',
+                "agri_sub_type": str(row.get('农用地细分', '')).strip() if pd.notna(row.get('农用地细分')) else '',
+                "ph_range": str(row.get('pH 分段', '')).strip() if pd.notna(row.get('pH 分段')) else '',
+                "water_class": str(row.get('水质类别', '')).strip() if pd.notna(row.get('水质类别')) else ''
             }
 
             # 处理采样日期
@@ -91,7 +107,8 @@ def parse_sample_data(df: pd.DataFrame) -> List[Dict]:
 
             # 提取检测指标数据（除了已处理的列之外的所有列）
             excluded_cols = ['样品编号', '样品名称', '样品类型', '样品来源', 
-                           '采样日期', '备注']
+                           '采样日期', '备注', '评价标准', '用地类型', 
+                           '农用地细分', 'pH 分段', '水质类别']
             detection_data = {}
             
             for col in df.columns:

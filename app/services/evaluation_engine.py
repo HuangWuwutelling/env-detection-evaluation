@@ -101,7 +101,8 @@ class EvaluationEngine:
         limits: List[dict],
         land_use_type: str = '',  # 用地类型（农用地/建设用地第一类/建设用地第二类）
         agri_sub_type: str = '',   # 农用地细分（水田/果园/其他）
-        ph_range: str = ''         # pH 分段（<5.5, 5.5-6.5, 6.5-7.5, >7.5）
+        ph_range: str = '',         # pH 分段（<5.5, 5.5-6.5, 6.5-7.5, >7.5）
+        water_class: str = ''       # 水质类别（I 类、II 类、III 类、IV 类、V 类）
     ) -> tuple:
         """
         评价整个样品
