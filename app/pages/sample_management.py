@@ -196,16 +196,16 @@ def show_add_sample_form(service: SampleService, db: Session):
 
 
 def download_template(standard_type: str):
-    """下载指定标准类型的模板"""
+    """下载指定标准类型的模板（统一模板）"""
     try:
         from utils.template_generator import create_template_excel
         
-        excel_data = create_template_excel(standard_type)
+        # 所有类型都生成统一模板
+        excel_data = create_template_excel(None)
         
         file_name = f"{standard_type}样品导入模板.xlsx"
         
         import io
-        # 重新生成一次以确保数据完整
         buffer = io.BytesIO(excel_data)
         
         st.download_button(
@@ -216,7 +216,7 @@ def download_template(standard_type: str):
             key=f"download_{standard_type}_template"
         )
         
-        st.success(f"✅ {standard_type}模板已生成，请点击下载按钮保存")
+        st.success(f"✅ {standard_type}模板已生成（统一模板），请点击下载按钮保存")
         
     except Exception as e:
         st.error(f"生成模板失败：{str(e)}")
@@ -229,8 +229,15 @@ def show_batch_import():
     # 添加模板下载部分
     st.subheader("📋 下载数据模板")
     st.markdown("""
+    **重要提示**：系统已升级为统一模板，一个模板支持所有环境检测类型！
+    
     请先下载与您评价标准对应的数据模板，按格式填写检测数据后再上传。
     这样可以确保数据格式正确，避免导入失败。
+    
+    **统一模板包含**：
+    - 🌱 **土壤**：用地类型、农用地细分、pH 分段
+    - 💧 **地表水/地下水/灌溉水**：水质类别（I-V 类）
+    - 📊 **所有类型**：评价标准自动匹配
     """)
     
     col1, col2 = st.columns(2)
